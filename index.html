@@ -1,0 +1,1278 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0">
+  <title>MoneyTrack</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=DM+Sans:opsz,wght@9..40,400;9..40,500;9..40,600;9..40,700&family=DM+Mono:wght@400;500&display=swap" rel="stylesheet">
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    :root {
+      --c-income:      #3B6D11;
+      --c-income-bg:   #EEF5E6;
+      --c-expense:     #A32D2D;
+      --c-expense-bg:  #F9EDED;
+      --c-savings:     #BA7517;
+      --c-savings-bg:  #FDF3E0;
+      --c-text:        #1A1A1A;
+      --c-muted:       #6B7280;
+      --c-border:      #E5E7EB;
+      --c-surface:     #FFFFFF;
+      --c-bg:          #F5F5F5;
+      --c-streak-bg:   #FDF3E0;
+      --c-streak-bdr:  #F5D78E;
+      --c-streak-txt:  #92400E;
+    }
+
+    html[data-theme="dark"] {
+      --c-text:        #F0F0F0;
+      --c-muted:       #9CA3AF;
+      --c-border:      #374151;
+      --c-surface:     #1F2937;
+      --c-bg:          #111827;
+      --c-streak-bg:   #2D2008;
+      --c-streak-bdr:  #4A3500;
+      --c-streak-txt:  #F5D78E;
+    }
+
+    @media (prefers-color-scheme: dark) {
+      html:not([data-theme="light"]):not([data-theme="dark"]) {
+        --c-text:      #F0F0F0;
+        --c-muted:     #9CA3AF;
+        --c-border:    #374151;
+        --c-surface:   #1F2937;
+        --c-bg:        #111827;
+        --c-streak-bg: #2D2008;
+        --c-streak-bdr:#4A3500;
+        --c-streak-txt:#F5D78E;
+      }
+    }
+
+    body {
+      font-family: 'DM Sans', -apple-system, BlinkMacSystemFont, sans-serif;
+      background: var(--c-bg);
+      color: var(--c-text);
+      min-height: 100vh;
+      -webkit-font-smoothing: antialiased;
+    }
+
+    .mono { font-family: 'DM Mono', 'Courier New', monospace; }
+
+    /* ── Onboarding ── */
+    #onboarding {
+      position: fixed; inset: 0; z-index: 100;
+      background: var(--c-bg);
+      display: flex; align-items: center; justify-content: center;
+      padding: 1.5rem;
+    }
+    .ob-card {
+      background: var(--c-surface);
+      border-radius: 24px;
+      padding: 2rem 1.5rem;
+      max-width: 400px; width: 100%;
+      border: 1px solid var(--c-border);
+    }
+    .ob-emoji { font-size: 2.75rem; text-align: center; margin-bottom: 0.75rem; }
+    .ob-title { font-size: 1.45rem; font-weight: 700; text-align: center; margin-bottom: 0.35rem; }
+    .ob-sub { font-size: 0.88rem; color: var(--c-muted); text-align: center; margin-bottom: 1.75rem; }
+    .ob-label { font-size: 0.75rem; font-weight: 600; color: var(--c-muted); text-transform: uppercase; letter-spacing: 0.5px; display: block; margin-bottom: 0.4rem; }
+    .ob-group { margin-bottom: 1rem; }
+    .ob-row { display: flex; align-items: center; gap: 0.75rem; margin-bottom: 0.5rem; }
+    .ob-hint { font-size: 0.85rem; color: var(--c-muted); }
+
+    /* ── App shell ── */
+    #app { display: flex; flex-direction: column; min-height: 100vh; }
+
+    /* ── Header ── */
+    #app-header {
+      background: var(--c-surface);
+      border-bottom: 1px solid var(--c-border);
+      padding: 0.9rem 1rem 0.75rem;
+      position: sticky; top: 0; z-index: 10;
+    }
+    .hdr-inner { max-width: 520px; margin: 0 auto; display: flex; justify-content: space-between; align-items: center; }
+    .hdr-left h1 { font-size: 1.1rem; font-weight: 700; letter-spacing: -0.3px; }
+    .hdr-date { font-size: 0.7rem; color: var(--c-muted); margin-top: 1px; }
+    .hdr-right { text-align: right; }
+    .hdr-bal-label { font-size: 0.65rem; color: var(--c-muted); text-transform: uppercase; letter-spacing: 0.5px; }
+    .hdr-bal-amt { font-size: 1.35rem; font-weight: 700; font-family: 'DM Mono', monospace; letter-spacing: -0.5px; }
+    .bal-pos { color: var(--c-income); }
+    .bal-neg { color: var(--c-expense); }
+
+    /* ── Tab container ── */
+    #tab-container {
+      flex: 1; max-width: 520px; margin: 0 auto; width: 100%;
+      padding: 1rem 1rem 5.5rem;
+    }
+
+    /* ── Tab panels ── */
+    .tab-panel { display: none; }
+    .tab-panel.tab-active {
+      display: flex; flex-direction: column; gap: 1rem;
+      animation: fadeIn 0.18s ease forwards;
+    }
+    @keyframes fadeIn {
+      from { opacity: 0; transform: translateY(4px); }
+      to   { opacity: 1; transform: none; }
+    }
+
+    /* ── Bottom Nav ── */
+    #bottom-nav {
+      position: fixed; bottom: 0; left: 0; right: 0;
+      background: var(--c-surface);
+      border-top: 1px solid var(--c-border);
+      display: flex; z-index: 10;
+      padding-bottom: env(safe-area-inset-bottom, 0);
+    }
+    .nav-btn {
+      flex: 1; display: flex; flex-direction: column; align-items: center; justify-content: center;
+      padding: 0.55rem 0.2rem; border: none; background: none; cursor: pointer;
+      color: var(--c-muted); transition: color 0.15s; min-height: 56px; gap: 2px;
+    }
+    .nav-btn.nav-active { color: var(--c-income); }
+    .nav-icon { font-size: 1.15rem; line-height: 1; }
+    .nav-label { font-size: 0.6rem; font-weight: 600; letter-spacing: 0.2px; }
+
+    /* ── Card ── */
+    .card {
+      background: var(--c-surface);
+      border-radius: 16px;
+      padding: 1.25rem;
+      border: 1px solid var(--c-border);
+    }
+    .card-title { font-size: 0.9rem; font-weight: 700; margin-bottom: 1rem; }
+
+    /* ── Summary grid ── */
+    .sum-grid { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 0.65rem; }
+    .sum-card { border-radius: 12px; padding: 0.9rem 0.65rem; text-align: center; }
+    .sc-income  { background: var(--c-income-bg); }
+    .sc-expense { background: var(--c-expense-bg); }
+    .sc-savings { background: var(--c-savings-bg); }
+    .sc-neutral { background: var(--c-surface); border: 1px solid var(--c-border); }
+    .sc-lbl { font-size: 0.62rem; font-weight: 600; text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 0.4rem; }
+    .sc-income  .sc-lbl { color: var(--c-income); }
+    .sc-expense .sc-lbl { color: var(--c-expense); }
+    .sc-savings .sc-lbl { color: var(--c-savings); }
+    .sc-neutral .sc-lbl { color: var(--c-muted); }
+    .sc-val { font-size: 1rem; font-weight: 700; font-family: 'DM Mono', monospace; }
+    .sc-income  .sc-val { color: var(--c-income); }
+    .sc-expense .sc-val { color: var(--c-expense); }
+    .sc-savings .sc-val { color: var(--c-savings); }
+
+    /* ── Streak ── */
+    .streak-card {
+      background: var(--c-streak-bg); border: 1.5px solid var(--c-streak-bdr);
+      border-radius: 12px; padding: 1rem 1.25rem;
+      display: flex; align-items: center; justify-content: space-between; gap: 0.5rem;
+    }
+    .streak-txt  { font-size: 1rem; font-weight: 700; color: var(--c-streak-txt); }
+    .streak-hint { font-size: 0.7rem; color: var(--c-streak-txt); opacity: 0.75; }
+
+    /* ── Progress bar ── */
+    .bar-track  { height: 10px; background: var(--c-border); border-radius: 99px; overflow: hidden; }
+    .bar-fill   { height: 100%; background: var(--c-income); border-radius: 99px; min-width: 2px; transition: width 0.35s ease, background 0.25s; }
+    .bar-warn   { background: var(--c-savings) !important; }
+    .bar-danger { background: var(--c-expense) !important; }
+
+    /* ── Daily limit section ── */
+    .limit-section { display: none; }
+    .limit-active  { display: block !important; }
+    .limit-hdr { display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.5rem; font-size: 0.8rem; }
+    .limit-lbl { color: var(--c-muted); }
+    .limit-pct { font-weight: 700; font-family: 'DM Mono', monospace; }
+    .limit-pct.warn   { color: var(--c-savings); }
+    .limit-pct.danger { color: var(--c-expense); }
+    .limit-warn-msg { margin-top: 0.5rem; font-size: 0.78rem; color: var(--c-expense); font-weight: 600; }
+
+    /* ── Type toggle ── */
+    .type-toggle { display: flex; border: 1.5px solid var(--c-border); border-radius: 12px; overflow: hidden; margin-bottom: 1rem; }
+    .toggle-btn {
+      flex: 1; padding: 0.75rem; border: none; background: transparent;
+      cursor: pointer; font-size: 0.9rem; font-weight: 600; color: var(--c-muted);
+      transition: background 0.2s, color 0.2s; min-height: 44px;
+      font-family: 'DM Sans', sans-serif;
+    }
+    .toggle-btn.income-active  { background: var(--c-income-bg);  color: var(--c-income); }
+    .toggle-btn.expense-active { background: var(--c-expense-bg); color: var(--c-expense); }
+
+    /* ── Form ── */
+    .form-group { margin-bottom: 0.75rem; }
+    .form-label { font-size: 0.75rem; font-weight: 600; color: var(--c-muted); display: block; margin-bottom: 0.35rem; }
+
+    input[type="text"], input[type="number"], select {
+      width: 100%; padding: 0.72rem 1rem; border: 1.5px solid var(--c-border);
+      border-radius: 10px; font-size: 0.95rem; color: var(--c-text);
+      background: var(--c-surface); outline: none; transition: border-color 0.2s;
+      font-family: 'DM Sans', sans-serif; -webkit-appearance: none; appearance: none;
+      min-height: 44px;
+    }
+    input:focus, select:focus { border-color: var(--c-income); }
+    select {
+      background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 12 12'%3E%3Cpath fill='%236B7280' d='M6 8L1 3h10z'/%3E%3C/svg%3E");
+      background-repeat: no-repeat; background-position: right 0.9rem center;
+      background-color: var(--c-surface); padding-right: 2.5rem;
+    }
+
+    /* ── Buttons ── */
+    .btn {
+      display: block; width: 100%; padding: 0.8rem 1rem; border: none;
+      border-radius: 10px; font-size: 0.92rem; font-weight: 600; cursor: pointer;
+      transition: opacity 0.15s, transform 0.1s; font-family: 'DM Sans', sans-serif;
+      min-height: 44px; text-align: center;
+    }
+    .btn:active { transform: scale(0.98); }
+    .btn:hover  { opacity: 0.88; }
+    .btn-primary { background: var(--c-income); color: #fff; }
+    .btn-ghost   { background: transparent; color: var(--c-muted); border: 1.5px solid var(--c-border); }
+    .btn-danger  { background: var(--c-expense-bg); color: var(--c-expense); border: 1.5px solid var(--c-expense); }
+    .btn-sm { padding: 0.42rem 0.85rem; font-size: 0.8rem; width: auto; display: inline-block; min-height: 36px; }
+    .btn-confirm { background: var(--c-expense) !important; color: #fff !important; border-color: var(--c-expense) !important; }
+
+    /* ── History ── */
+    .hist-item { display: flex; align-items: center; padding: 0.75rem 0; border-bottom: 1px solid var(--c-border); gap: 0.75rem; }
+    .hist-item:last-child { border-bottom: none; padding-bottom: 0; }
+    .hist-icon { font-size: 1.1rem; width: 36px; height: 36px; display: flex; align-items: center; justify-content: center; flex-shrink: 0; border-radius: 10px; }
+    .hist-icon.inc-ico { background: var(--c-income-bg); }
+    .hist-icon.exp-ico { background: var(--c-expense-bg); }
+    .hist-info { flex: 1; min-width: 0; }
+    .hist-desc { font-size: 0.88rem; font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    .hist-meta { font-size: 0.7rem; color: var(--c-muted); margin-top: 2px; }
+    .hist-amt  { font-weight: 700; font-size: 0.88rem; font-family: 'DM Mono', monospace; flex-shrink: 0; }
+    .hist-amt.income  { color: var(--c-income); }
+    .hist-amt.expense { color: var(--c-expense); }
+    .btn-del { background: none; border: none; color: var(--c-border); cursor: pointer; font-size: 0.85rem; padding: 0.25rem; flex-shrink: 0; transition: color 0.15s; min-width: 28px; min-height: 28px; display: flex; align-items: center; justify-content: center; }
+    .btn-del:hover { color: var(--c-expense); }
+    .date-grp-hdr { font-size: 0.72rem; font-weight: 700; color: var(--c-muted); text-transform: uppercase; letter-spacing: 0.5px; padding: 0.7rem 0 0.35rem; }
+
+    /* ── Empty state ── */
+    .empty { text-align: center; color: var(--c-muted); font-size: 0.88rem; padding: 1.5rem 0; }
+
+    /* ── Goal ── */
+    .goal-hdr { display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 0.65rem; }
+    .goal-name  { font-size: 0.95rem; font-weight: 700; }
+    .goal-sub   { font-size: 0.78rem; color: var(--c-muted); margin-bottom: 0.5rem; }
+    .goal-pct   { font-size: 0.73rem; color: var(--c-muted); margin-top: 0.4rem; }
+
+    /* ── Savings calc ── */
+    .calc-box { margin-top: 0.75rem; padding: 1rem; background: var(--c-savings-bg); border-radius: 10px; text-align: center; }
+    .calc-box .big-num { font-size: 1.9rem; font-weight: 700; font-family: 'DM Mono', monospace; color: var(--c-savings); display: block; margin: 0.2rem 0; }
+    .calc-box .calc-desc { font-size: 0.8rem; color: var(--c-muted); }
+
+    /* ── Wishlist ── */
+    .wish-item { display: flex; align-items: flex-start; gap: 0.75rem; padding: 0.85rem 0; border-bottom: 1px solid var(--c-border); }
+    .wish-item:last-child { border-bottom: none; padding-bottom: 0; }
+    .wish-item.purchased { opacity: 0.5; }
+    .wish-info { flex: 1; }
+    .wish-name  { font-size: 0.9rem; font-weight: 600; }
+    .wish-price { font-size: 0.8rem; font-family: 'DM Mono', monospace; color: var(--c-savings); margin-top: 2px; }
+    .wish-days  { font-size: 0.72rem; color: var(--c-muted); margin-top: 3px; }
+    .wish-actions { display: flex; flex-direction: column; gap: 0.35rem; align-items: flex-end; flex-shrink: 0; }
+    .archived-lbl { font-size: 0.7rem; font-weight: 700; text-transform: uppercase; letter-spacing: 0.5px; color: var(--c-muted); margin: 0.75rem 0 0.4rem; }
+
+    /* ── Period toggle ── */
+    .period-toggle { display: flex; border: 1.5px solid var(--c-border); border-radius: 10px; overflow: hidden; }
+    .period-btn { flex: 1; padding: 0.65rem; border: none; background: transparent; cursor: pointer; font-size: 0.88rem; font-weight: 600; color: var(--c-muted); transition: background 0.15s, color 0.15s; font-family: 'DM Sans', sans-serif; }
+    .period-btn.active { background: var(--c-income); color: #fff; }
+
+    /* ── Bar chart ── */
+    .chart-row { display: flex; align-items: center; gap: 0.65rem; margin-bottom: 0.7rem; }
+    .chart-row:last-child { margin-bottom: 0; }
+    .chart-lbl  { width: 90px; font-size: 0.75rem; color: var(--c-muted); flex-shrink: 0; }
+    .chart-track { flex: 1; height: 18px; background: var(--c-border); border-radius: 4px; overflow: hidden; }
+    .chart-fill  { height: 100%; background: var(--c-expense); border-radius: 4px; transition: width 0.4s ease; }
+    .chart-amt   { font-size: 0.75rem; font-weight: 600; color: var(--c-expense); font-family: 'DM Mono', monospace; flex-shrink: 0; text-align: right; min-width: 68px; }
+
+    /* ── Bill splitter ── */
+    .split-result { margin-top: 1rem; padding: 1.25rem; background: var(--c-income-bg); border-radius: 12px; text-align: center; }
+    .split-per   { font-size: 2.2rem; font-weight: 700; font-family: 'DM Mono', monospace; color: var(--c-income); display: block; }
+    .split-label { font-size: 0.8rem; color: var(--c-muted); margin-top: 0.3rem; }
+
+    /* ── Envelopes ── */
+    .env-row { margin-bottom: 1rem; }
+    .env-row:last-child { margin-bottom: 0; }
+    .env-hdr { display: flex; align-items: center; justify-content: space-between; margin-bottom: 0.45rem; }
+    .env-cat  { font-size: 0.88rem; font-weight: 600; }
+    .env-amts { font-size: 0.75rem; color: var(--c-muted); font-family: 'DM Mono', monospace; }
+    .env-amts.warn   { color: var(--c-savings); }
+    .env-amts.danger { color: var(--c-expense); }
+    .env-inp { margin-top: 0.45rem; }
+    .env-inp input { padding: 0.45rem 0.85rem; font-size: 0.85rem; min-height: 38px; }
+
+    /* ── Settings ── */
+    .s-row { display: flex; align-items: center; justify-content: space-between; padding: 0.85rem 0; border-bottom: 1px solid var(--c-border); gap: 1rem; }
+    .s-row:last-child { border-bottom: none; }
+    .s-row-lbl { font-size: 0.9rem; font-weight: 500; }
+    .s-row-sub { font-size: 0.73rem; color: var(--c-muted); margin-top: 2px; }
+    .s-row-col { flex-direction: column; align-items: flex-start; gap: 0.65rem; }
+
+    /* ── Toggle switch ── */
+    .toggle-sw { position: relative; width: 46px; height: 26px; flex-shrink: 0; }
+    .toggle-sw input { display: none; }
+    .toggle-sw .slider { position: absolute; inset: 0; background: var(--c-border); border-radius: 99px; cursor: pointer; transition: background 0.2s; }
+    .toggle-sw .slider::after { content: ''; position: absolute; width: 20px; height: 20px; background: #fff; border-radius: 50%; top: 3px; left: 3px; transition: transform 0.2s; box-shadow: 0 1px 3px rgba(0,0,0,0.25); }
+    .toggle-sw input:checked + .slider { background: var(--c-income); }
+    .toggle-sw input:checked + .slider::after { transform: translateX(20px); }
+
+    /* ── Dark mode buttons ── */
+    .dm-opts { display: flex; gap: 0.5rem; }
+    .dm-btn  { flex: 1; padding: 0.5rem; border: 1.5px solid var(--c-border); border-radius: 8px; background: transparent; cursor: pointer; font-size: 0.8rem; color: var(--c-muted); font-family: 'DM Sans', sans-serif; transition: border-color 0.15s, color 0.15s, background 0.15s; }
+    .dm-btn.active { border-color: var(--c-income); color: var(--c-income); background: var(--c-income-bg); font-weight: 600; }
+
+    /* ── Misc ── */
+    .row-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 0.75rem; }
+    .version-lbl { text-align: center; font-size: 0.73rem; color: var(--c-muted); padding: 1rem 0; }
+    .search-wrap { margin-bottom: 0.75rem; }
+
+    @media (max-width: 360px) {
+      .sum-grid { grid-template-columns: 1fr 1fr; }
+      .sc-bal   { grid-column: span 2; }
+    }
+    @media (min-width: 520px) {
+      #tab-container { padding-top: 1.5rem; }
+    }
+  </style>
+</head>
+<body>
+
+<!-- ════════════════ ONBOARDING ════════════════ -->
+<div id="onboarding" style="display:none">
+  <div class="ob-card">
+    <div class="ob-emoji">💰</div>
+    <h2 class="ob-title">Welcome to MoneyTrack</h2>
+    <p class="ob-sub">Set up your account in seconds.</p>
+
+    <div class="ob-group">
+      <label class="ob-label" for="ob-name">Your name</label>
+      <input type="text" id="ob-name" placeholder="e.g. Alex" maxlength="30">
+    </div>
+
+    <div class="ob-group">
+      <label class="ob-label" for="ob-currency">Currency</label>
+      <select id="ob-currency">
+        <option value="THB">Thai Baht (฿)</option>
+        <option value="USD">US Dollar ($)</option>
+        <option value="JPY">Japanese Yen (¥)</option>
+        <option value="GBP">British Pound (£)</option>
+        <option value="EUR">Euro (€)</option>
+        <option value="SGD">Singapore Dollar (S$)</option>
+      </select>
+    </div>
+
+    <div class="ob-group">
+      <label class="ob-label">Daily spending limit</label>
+      <div class="ob-row">
+        <label class="toggle-sw">
+          <input type="checkbox" id="ob-limit-on" onchange="document.getElementById('ob-limit-amt').style.display=this.checked?'block':'none'">
+          <span class="slider"></span>
+        </label>
+        <span class="ob-hint">Enable daily limit</span>
+      </div>
+      <input type="number" id="ob-limit-amt" placeholder="Amount per day" min="0" inputmode="decimal" style="display:none">
+    </div>
+
+    <button class="btn btn-primary" onclick="completeOnboarding()">Get Started →</button>
+  </div>
+</div>
+
+<!-- ════════════════ MAIN APP ════════════════ -->
+<div id="app" style="display:none">
+
+  <header id="app-header">
+    <div class="hdr-inner">
+      <div class="hdr-left">
+        <h1>MoneyTrack 💵</h1>
+        <div class="hdr-date" id="hdr-date"></div>
+      </div>
+      <div class="hdr-right">
+        <div class="hdr-bal-label">Total Balance</div>
+        <div class="hdr-bal-amt mono" id="hdr-balance">฿0</div>
+      </div>
+    </div>
+  </header>
+
+  <main id="tab-container">
+
+    <!-- ── HOME ── -->
+    <section id="tab-home" class="tab-panel">
+
+      <div class="streak-card">
+        <span class="streak-txt" id="streak-display">🔥 Start your streak!</span>
+        <span class="streak-hint">Log daily to keep it</span>
+      </div>
+
+      <div class="sum-grid">
+        <div class="sum-card sc-income">
+          <div class="sc-lbl">Earned</div>
+          <div class="sc-val" id="today-inc">฿0</div>
+        </div>
+        <div class="sum-card sc-expense">
+          <div class="sc-lbl">Spent</div>
+          <div class="sc-val" id="today-exp">฿0</div>
+        </div>
+        <div class="sum-card sc-neutral sc-bal">
+          <div class="sc-lbl">Balance</div>
+          <div class="sc-val" id="today-bal" style="color:var(--c-income)">฿0</div>
+        </div>
+      </div>
+
+      <div class="card limit-section" id="limit-section">
+        <div class="limit-hdr">
+          <span class="limit-lbl">Today's spending limit</span>
+          <span class="limit-pct" id="limit-pct">0%</span>
+        </div>
+        <div class="bar-track"><div class="bar-fill" id="limit-bar" style="width:0%"></div></div>
+        <div class="limit-warn-msg" id="limit-warn" style="display:none">⚠️ Daily limit exceeded!</div>
+      </div>
+
+      <div class="card">
+        <div class="card-title">Add Transaction</div>
+        <div class="type-toggle">
+          <button id="btn-income"  class="toggle-btn income-active"  onclick="setType('income')">+ Income</button>
+          <button id="btn-expense" class="toggle-btn"                onclick="setType('expense')">− Expense</button>
+        </div>
+        <div class="form-group">
+          <input type="text" id="tx-desc" placeholder="Description (e.g. Lunch, Salary)" maxlength="50">
+        </div>
+        <div class="form-group" id="cat-group" style="display:none">
+          <select id="tx-cat">
+            <option value="Food">🍔 Food</option>
+            <option value="Transport">🚌 Transport</option>
+            <option value="Entertainment">🎮 Entertainment</option>
+            <option value="School">📚 School</option>
+            <option value="Shopping">🛍️ Shopping</option>
+            <option value="Other">📦 Other</option>
+          </select>
+        </div>
+        <div class="form-group">
+          <input type="number" id="tx-amt" placeholder="Amount" min="0" inputmode="decimal">
+        </div>
+        <button class="btn btn-primary" onclick="addTransaction()">Add</button>
+      </div>
+
+    </section>
+
+    <!-- ── HISTORY ── -->
+    <section id="tab-history" class="tab-panel">
+      <div class="card">
+        <div class="card-title">Transaction History 📋</div>
+        <div class="search-wrap">
+          <input type="text" id="hist-search" placeholder="Search transactions…" oninput="renderHistory()">
+        </div>
+        <div id="hist-list"><p class="empty">No transactions yet.</p></div>
+      </div>
+    </section>
+
+    <!-- ── SAVE ── -->
+    <section id="tab-save" class="tab-panel">
+
+      <div class="card">
+        <div class="card-title">Savings Goal 🎯</div>
+        <div id="goal-display"></div>
+        <div id="goal-form">
+          <div class="form-group">
+            <input type="text" id="goal-name" placeholder="Goal name (e.g. New Phone)" maxlength="40">
+          </div>
+          <div class="form-group">
+            <input type="number" id="goal-target" placeholder="Target amount" min="0" inputmode="decimal">
+          </div>
+          <button class="btn btn-primary" onclick="setGoal()">Set Goal</button>
+        </div>
+      </div>
+
+      <div class="card">
+        <div class="card-title">Wishlist Tracker 🛒</div>
+        <div class="form-group">
+          <input type="text" id="wish-name" placeholder="Item name (e.g. Sneakers)" maxlength="40">
+        </div>
+        <div class="row-2">
+          <div class="form-group">
+            <input type="number" id="wish-price" placeholder="Price" min="0" inputmode="decimal">
+          </div>
+          <div class="form-group">
+            <input type="number" id="wish-daily" placeholder="Save/day" min="0" inputmode="decimal">
+          </div>
+        </div>
+        <button class="btn btn-primary" onclick="addWishItem()">Add to Wishlist</button>
+        <div id="wish-list" style="margin-top:0.85rem"></div>
+      </div>
+
+      <div class="card">
+        <div class="card-title">Savings Calculator 📊</div>
+        <div class="form-group">
+          <input type="number" id="calc-amt" placeholder="Save per day" min="0" inputmode="decimal">
+        </div>
+        <div class="form-group">
+          <select id="calc-period">
+            <option value="7">7 Days</option>
+            <option value="30">30 Days (1 Month)</option>
+            <option value="90">90 Days (3 Months)</option>
+            <option value="180">180 Days (6 Months)</option>
+            <option value="365">365 Days (1 Year)</option>
+          </select>
+        </div>
+        <button class="btn btn-ghost" onclick="calcSavings()">Calculate</button>
+        <div id="calc-result" style="display:none"></div>
+      </div>
+
+    </section>
+
+    <!-- ── SUMMARY ── -->
+    <section id="tab-summary" class="tab-panel">
+
+      <div class="card">
+        <div class="period-toggle">
+          <button class="period-btn active" id="period-week"  onclick="setPeriod('week')">This Week</button>
+          <button class="period-btn"        id="period-month" onclick="setPeriod('month')">This Month</button>
+        </div>
+      </div>
+
+      <div class="sum-grid" id="sum-cards"></div>
+
+      <div class="card">
+        <div class="card-title">Spending by Category</div>
+        <div id="sum-chart"><p class="empty">No expenses in this period.</p></div>
+      </div>
+
+    </section>
+
+    <!-- ── TOOLS ── -->
+    <section id="tab-tools" class="tab-panel">
+
+      <div class="card">
+        <div class="card-title">Bill Splitter 🧾</div>
+        <div class="form-group">
+          <label class="form-label">Total bill amount</label>
+          <input type="number" id="split-total" placeholder="0.00" min="0" inputmode="decimal">
+        </div>
+        <div class="row-2">
+          <div class="form-group">
+            <label class="form-label">Number of people</label>
+            <input type="number" id="split-people" placeholder="2" min="1" inputmode="decimal">
+          </div>
+          <div class="form-group">
+            <label class="form-label">Tip %</label>
+            <input type="number" id="split-tip" placeholder="0" min="0" inputmode="decimal">
+          </div>
+        </div>
+        <button class="btn btn-primary" onclick="splitBill()">Split Bill</button>
+        <div id="split-result" style="display:none"></div>
+      </div>
+
+      <div class="card">
+        <div class="card-title">Budget Envelopes 🗂️</div>
+        <p style="font-size:0.78rem;color:var(--c-muted);margin-bottom:1rem">Weekly budget per category. Spending resets every Monday.</p>
+        <div id="env-list"></div>
+        <button class="btn btn-primary" id="btn-save-env" style="margin-top:0.75rem" onclick="saveEnvelopes()">Save Budgets</button>
+      </div>
+
+    </section>
+
+    <!-- ── SETTINGS ── -->
+    <section id="tab-settings" class="tab-panel">
+
+      <div class="card">
+        <div class="card-title">Preferences</div>
+
+        <div class="s-row">
+          <div><div class="s-row-lbl">Currency</div></div>
+          <select id="s-currency" style="width:auto;min-height:auto;padding:0.42rem 2.2rem 0.42rem 0.7rem;font-size:0.88rem" onchange="changeCurrency(this.value)">
+            <option value="THB">฿ Thai Baht</option>
+            <option value="USD">$ US Dollar</option>
+            <option value="JPY">¥ Japanese Yen</option>
+            <option value="GBP">£ British Pound</option>
+            <option value="EUR">€ Euro</option>
+            <option value="SGD">S$ Singapore Dollar</option>
+          </select>
+        </div>
+
+        <div class="s-row">
+          <div>
+            <div class="s-row-lbl">Daily Spending Limit</div>
+            <div class="s-row-sub">Warning when you overspend</div>
+          </div>
+          <label class="toggle-sw">
+            <input type="checkbox" id="s-limit-on" onchange="toggleLimit(this.checked)">
+            <span class="slider"></span>
+          </label>
+        </div>
+        <div id="s-limit-wrap" style="display:none;padding-bottom:0.75rem">
+          <input type="number" id="s-limit-amt" placeholder="Daily limit amount" min="0" inputmode="decimal" onchange="saveLimitAmt()">
+        </div>
+
+        <div class="s-row s-row-col">
+          <div class="s-row-lbl">Appearance</div>
+          <div class="dm-opts">
+            <button class="dm-btn" id="dm-auto"  onclick="setDarkMode('auto')">Auto</button>
+            <button class="dm-btn" id="dm-light" onclick="setDarkMode('light')">☀️ Light</button>
+            <button class="dm-btn" id="dm-dark"  onclick="setDarkMode('dark')">🌙 Dark</button>
+          </div>
+        </div>
+
+      </div>
+
+      <div class="card">
+        <div class="card-title">Data</div>
+        <div class="s-row" style="flex-direction:column;align-items:flex-start;border:none;padding-bottom:0">
+          <div class="s-row-lbl">Reset All Data</div>
+          <div class="s-row-sub">Permanently delete all transactions and settings</div>
+        </div>
+        <button class="btn btn-danger" id="btn-reset" onclick="resetData()" style="margin-top:0.75rem">Reset All Data</button>
+      </div>
+
+      <div class="version-lbl">MoneyTrack v1.0.0</div>
+
+    </section>
+
+  </main>
+
+  <nav id="bottom-nav">
+    <button class="nav-btn nav-active" data-tab="home"     onclick="navigate('home')">
+      <span class="nav-icon">🏠</span><span class="nav-label">Home</span>
+    </button>
+    <button class="nav-btn" data-tab="history"  onclick="navigate('history')">
+      <span class="nav-icon">📋</span><span class="nav-label">History</span>
+    </button>
+    <button class="nav-btn" data-tab="save"     onclick="navigate('save')">
+      <span class="nav-icon">💰</span><span class="nav-label">Save</span>
+    </button>
+    <button class="nav-btn" data-tab="summary"  onclick="navigate('summary')">
+      <span class="nav-icon">📊</span><span class="nav-label">Summary</span>
+    </button>
+    <button class="nav-btn" data-tab="tools"    onclick="navigate('tools')">
+      <span class="nav-icon">🔧</span><span class="nav-label">Tools</span>
+    </button>
+    <button class="nav-btn" data-tab="settings" onclick="navigate('settings')">
+      <span class="nav-icon">⚙️</span><span class="nav-label">Settings</span>
+    </button>
+  </nav>
+
+</div>
+
+<script>
+// ══════════════════════════════════════════════
+// CONSTANTS
+// ══════════════════════════════════════════════
+
+const STORAGE_KEY = 'moneytracker_data';
+
+const DEFAULT_DATA = {
+  onboarded: false, userName: '', currency: 'THB', darkMode: 'auto',
+  dailyLimit: { enabled: false, amount: 0 },
+  transactions: [], goal: null,
+  streak: { lastLogDate: null, currentStreak: 0 },
+  envelopes: { Food: 0, Transport: 0, Entertainment: 0, School: 0, Shopping: 0, Other: 0 },
+  wishlist: []
+};
+
+const CURRENCIES = {
+  THB: { symbol: '฿',  decimals: 2 },
+  USD: { symbol: '$',  decimals: 2 },
+  JPY: { symbol: '¥',  decimals: 0 },
+  GBP: { symbol: '£',  decimals: 2 },
+  EUR: { symbol: '€',  decimals: 2 },
+  SGD: { symbol: 'S$', decimals: 2 },
+};
+
+const CAT_ICONS = {
+  Food: '🍔', Transport: '🚌', Entertainment: '🎮',
+  School: '📚', Shopping: '🛍️', Other: '📦'
+};
+
+// ══════════════════════════════════════════════
+// DATA
+// ══════════════════════════════════════════════
+
+let data = loadData();
+let activeTab = 'home';
+let summaryMode = 'week';
+let currentType = 'income';
+let resetTimer = null;
+
+function loadData() {
+  const raw = localStorage.getItem(STORAGE_KEY);
+  if (raw) {
+    try {
+      const p = JSON.parse(raw);
+      return {
+        ...DEFAULT_DATA, ...p,
+        dailyLimit: { ...DEFAULT_DATA.dailyLimit, ...(p.dailyLimit || {}) },
+        streak:     { ...DEFAULT_DATA.streak,     ...(p.streak     || {}) },
+        envelopes:  { ...DEFAULT_DATA.envelopes,  ...(p.envelopes  || {}) },
+      };
+    } catch (e) {}
+  }
+
+  // Migrate from old separate keys
+  const oldT = localStorage.getItem('moneytrack_transactions');
+  const oldG = localStorage.getItem('moneytrack_goal');
+  const oldS = localStorage.getItem('moneytrack_streak');
+  const oldB = localStorage.getItem('moneytrack_budgets');
+
+  if (oldT || oldG) {
+    const m = JSON.parse(JSON.stringify(DEFAULT_DATA));
+    m.onboarded = true; m.currency = 'THB';
+    try { if (oldT) m.transactions = JSON.parse(oldT); } catch(e) {}
+    try { if (oldG) m.goal         = JSON.parse(oldG); } catch(e) {}
+    try { if (oldS) Object.assign(m.streak, JSON.parse(oldS)); } catch(e) {}
+    try { if (oldB) { const b = JSON.parse(oldB); Object.keys(m.envelopes).forEach(c => { m.envelopes[c] = b[c] || 0; }); } } catch(e) {}
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(m));
+    return m;
+  }
+
+  return JSON.parse(JSON.stringify(DEFAULT_DATA));
+}
+
+function saveData() {
+  localStorage.setItem(STORAGE_KEY, JSON.stringify(data));
+}
+
+// ══════════════════════════════════════════════
+// FORMATTING
+// ══════════════════════════════════════════════
+
+function fmt(n) {
+  const c = CURRENCIES[data.currency] || CURRENCIES.THB;
+  const v = Math.round(Number(n) * 100) / 100;
+  return c.symbol + v.toLocaleString('en-US', {
+    minimumFractionDigits: c.decimals, maximumFractionDigits: c.decimals
+  });
+}
+
+function todayStr() { return new Date().toISOString().split('T')[0]; }
+
+function yesterdayStr() {
+  const d = new Date(); d.setDate(d.getDate() - 1);
+  return d.toISOString().split('T')[0];
+}
+
+function mondayStr() {
+  const d = new Date();
+  const diff = d.getDay() === 0 ? -6 : 1 - d.getDay();
+  d.setDate(d.getDate() + diff);
+  return d.toISOString().split('T')[0];
+}
+
+function monthStartStr() {
+  const d = new Date();
+  return d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-01';
+}
+
+function fmtDateShort(s) {
+  const [y, m, dd] = s.split('-').map(Number);
+  return new Date(y, m - 1, dd).toLocaleDateString('en', { weekday: 'short', month: 'short', day: 'numeric' });
+}
+
+function esc(s) {
+  return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+}
+
+// ══════════════════════════════════════════════
+// DARK MODE
+// ══════════════════════════════════════════════
+
+function applyDarkMode() {
+  const h = document.documentElement;
+  if (data.darkMode === 'dark')  { h.setAttribute('data-theme', 'dark');  }
+  else if (data.darkMode === 'light') { h.setAttribute('data-theme', 'light'); }
+  else { h.removeAttribute('data-theme'); }
+}
+
+function setDarkMode(mode) {
+  data.darkMode = mode; saveData(); applyDarkMode();
+  ['auto','light','dark'].forEach(m => document.getElementById('dm-' + m).classList.toggle('active', m === mode));
+}
+
+// ══════════════════════════════════════════════
+// NAVIGATION
+// ══════════════════════════════════════════════
+
+function navigate(tabId) {
+  document.querySelectorAll('.tab-panel').forEach(p => p.classList.remove('tab-active'));
+  document.getElementById('tab-' + tabId).classList.add('tab-active');
+  document.querySelectorAll('.nav-btn').forEach(b => b.classList.remove('nav-active'));
+  document.querySelector('.nav-btn[data-tab="' + tabId + '"]').classList.add('nav-active');
+  activeTab = tabId;
+  renderHeader();
+  ({ home: renderHome, history: renderHistory, save: renderSave,
+     summary: renderSummary, tools: renderTools, settings: renderSettings })[tabId]?.();
+}
+
+// ══════════════════════════════════════════════
+// HEADER
+// ══════════════════════════════════════════════
+
+function renderHeader() {
+  const inc = data.transactions.filter(t => t.type === 'income').reduce((s,t) => s + t.amount, 0);
+  const exp = data.transactions.filter(t => t.type === 'expense').reduce((s,t) => s + t.amount, 0);
+  const net = inc - exp;
+  const el = document.getElementById('hdr-balance');
+  el.textContent = fmt(net);
+  el.className = 'hdr-bal-amt mono ' + (net < 0 ? 'bal-neg' : 'bal-pos');
+  document.getElementById('hdr-date').textContent =
+    new Date().toLocaleDateString('en', { weekday: 'short', month: 'short', day: 'numeric' });
+}
+
+// ══════════════════════════════════════════════
+// HOME TAB
+// ══════════════════════════════════════════════
+
+function renderHome() {
+  // Streak
+  const n = data.streak.currentStreak;
+  document.getElementById('streak-display').textContent =
+    n === 0 ? '🔥 Start your streak today!' :
+    n === 1 ? '🔥 1 Day Streak — keep going!' :
+              '🔥 ' + n + ' Day Streak!';
+
+  // Today totals
+  const t   = todayStr();
+  const day = data.transactions.filter(x => x.date === t);
+  const inc = day.filter(x => x.type === 'income').reduce((s,x) => s + x.amount, 0);
+  const exp = day.filter(x => x.type === 'expense').reduce((s,x) => s + x.amount, 0);
+  const bal = inc - exp;
+
+  document.getElementById('today-inc').textContent = fmt(inc);
+  document.getElementById('today-exp').textContent = fmt(exp);
+  const balEl = document.getElementById('today-bal');
+  balEl.textContent = fmt(bal);
+  balEl.style.color = bal < 0 ? 'var(--c-expense)' : 'var(--c-income)';
+
+  // Daily limit bar
+  const sec = document.getElementById('limit-section');
+  if (data.dailyLimit.enabled && data.dailyLimit.amount > 0) {
+    sec.classList.add('limit-active');
+    const pct = (exp / data.dailyLimit.amount) * 100;
+    const bar = document.getElementById('limit-bar');
+    const lbl = document.getElementById('limit-pct');
+    bar.style.width = Math.min(100, pct).toFixed(1) + '%';
+    bar.className = 'bar-fill' + (pct >= 100 ? ' bar-danger' : pct >= 75 ? ' bar-warn' : '');
+    lbl.textContent = Math.round(pct) + '%';
+    lbl.className = 'limit-pct' + (pct >= 100 ? ' danger' : pct >= 75 ? ' warn' : '');
+    document.getElementById('limit-warn').style.display = pct >= 100 ? 'block' : 'none';
+  } else {
+    sec.classList.remove('limit-active');
+  }
+}
+
+// ══════════════════════════════════════════════
+// TRANSACTION FORM
+// ══════════════════════════════════════════════
+
+function setType(type) {
+  currentType = type;
+  document.getElementById('btn-income').className  = 'toggle-btn' + (type === 'income'  ? ' income-active'  : '');
+  document.getElementById('btn-expense').className = 'toggle-btn' + (type === 'expense' ? ' expense-active' : '');
+  document.getElementById('cat-group').style.display = type === 'expense' ? 'block' : 'none';
+}
+
+function addTransaction() {
+  const desc = document.getElementById('tx-desc').value.trim();
+  const raw  = document.getElementById('tx-amt').value;
+  const amt  = Math.round(parseFloat(raw) * 100) / 100;
+  const cat  = currentType === 'expense' ? document.getElementById('tx-cat').value : null;
+
+  if (!desc)                 { alert('Please enter a description.'); return; }
+  if (!raw || isNaN(amt) || amt <= 0) { alert('Please enter a valid amount.'); return; }
+
+  if (currentType === 'expense') {
+    const lim = data.envelopes[cat];
+    if (lim > 0) {
+      const mon   = mondayStr();
+      const spent = data.transactions.filter(t => t.type === 'expense' && t.category === cat && t.date >= mon)
+                      .reduce((s,t) => s + t.amount, 0);
+      if (spent + amt > lim) {
+        const ok = confirm('⚠️ This will bring ' + cat + ' to ' + fmt(spent + amt) + ' — over your ' + fmt(lim) + ' weekly budget.\n\nAdd anyway?');
+        if (!ok) return;
+      }
+    }
+  }
+
+  data.transactions.unshift({ id: Date.now(), type: currentType, description: desc, category: cat, amount: amt, date: todayStr() });
+  updateStreak();
+  saveData();
+
+  document.getElementById('tx-desc').value = '';
+  document.getElementById('tx-amt').value  = '';
+  renderHeader();
+  renderHome();
+}
+
+function renderTab(tabId) {
+  ({ home: renderHome, history: renderHistory, save: renderSave,
+     summary: renderSummary, tools: renderTools, settings: renderSettings })[tabId]?.();
+}
+
+function deleteTransaction(id) {
+  data.transactions = data.transactions.filter(t => t.id !== id);
+  saveData();
+  renderHeader();
+  renderTab(activeTab);
+}
+
+// ══════════════════════════════════════════════
+// STREAK
+// ══════════════════════════════════════════════
+
+function updateStreak() {
+  const t = todayStr();
+  if (data.streak.lastLogDate === t) return;
+  data.streak.currentStreak = (data.streak.lastLogDate === yesterdayStr()) ? data.streak.currentStreak + 1 : 1;
+  data.streak.lastLogDate = t;
+}
+
+// ══════════════════════════════════════════════
+// HISTORY TAB
+// ══════════════════════════════════════════════
+
+function renderHistory() {
+  const q    = (document.getElementById('hist-search')?.value || '').toLowerCase();
+  const txns = data.transactions.filter(t => !q || t.description.toLowerCase().includes(q));
+  const list = document.getElementById('hist-list');
+
+  if (!txns.length) {
+    list.innerHTML = '<p class="empty">' + (q ? 'No results found.' : 'No transactions yet. Add one on Home!') + '</p>';
+    return;
+  }
+
+  const groups = {};
+  txns.forEach(t => { (groups[t.date] = groups[t.date] || []).push(t); });
+  const dates  = Object.keys(groups).sort((a,b) => b.localeCompare(a));
+  const today  = todayStr(); const yesterday = yesterdayStr();
+
+  list.innerHTML = dates.map(date => {
+    const label = date === today ? 'Today' : date === yesterday ? 'Yesterday' : fmtDateShort(date);
+    const rows = groups[date].map(t => {
+      const ico = t.type === 'income' ? '💚' : (CAT_ICONS[t.category] || '📦');
+      const cls = t.type === 'income' ? 'inc-ico' : 'exp-ico';
+      const meta = t.type === 'expense' && t.category ? t.category : 'Income';
+      const sign = t.type === 'income' ? '+' : '−';
+      return `<div class="hist-item">
+        <span class="hist-icon ${cls}">${ico}</span>
+        <div class="hist-info">
+          <p class="hist-desc">${esc(t.description)}</p>
+          <p class="hist-meta">${meta}</p>
+        </div>
+        <span class="hist-amt ${t.type}">${sign}${fmt(t.amount)}</span>
+        <button class="btn-del" onclick="deleteTransaction(${t.id})" title="Delete">✕</button>
+      </div>`;
+    }).join('');
+    return `<div class="date-grp-hdr">${label}</div>${rows}`;
+  }).join('');
+}
+
+// ══════════════════════════════════════════════
+// SAVE TAB
+// ══════════════════════════════════════════════
+
+function renderSave() { renderGoal(); renderWishlist(); }
+
+// Goal
+
+function setGoal() {
+  const name   = document.getElementById('goal-name').value.trim();
+  const target = Math.round(parseFloat(document.getElementById('goal-target').value) * 100) / 100;
+  if (!name)               { alert('Please enter a goal name.'); return; }
+  if (!target || target <= 0) { alert('Please enter a valid target amount.'); return; }
+  data.goal = { name, target }; saveData();
+  document.getElementById('goal-name').value = ''; document.getElementById('goal-target').value = '';
+  renderGoal();
+}
+
+function clearGoal() { data.goal = null; saveData(); renderGoal(); }
+
+function renderGoal() {
+  const disp = document.getElementById('goal-display');
+  const form = document.getElementById('goal-form');
+  if (!data.goal) { disp.innerHTML = ''; form.style.display = 'block'; return; }
+
+  const inc  = data.transactions.filter(t => t.type === 'income').reduce((s,t) => s + t.amount, 0);
+  const exp  = data.transactions.filter(t => t.type === 'expense').reduce((s,t) => s + t.amount, 0);
+  const saved = Math.max(0, inc - exp);
+  const pct   = Math.min(100, (saved / data.goal.target) * 100);
+  const rem   = Math.max(0, data.goal.target - saved);
+
+  disp.innerHTML = `
+    <div class="goal-hdr">
+      <div>
+        <div class="goal-name">🎯 ${esc(data.goal.name)}</div>
+        <div class="goal-sub">${fmt(saved)} saved of ${fmt(data.goal.target)}</div>
+      </div>
+      <button class="btn btn-ghost btn-sm" onclick="clearGoal()">Clear</button>
+    </div>
+    <div class="bar-track" style="height:14px">
+      <div class="bar-fill" style="width:${pct.toFixed(1)}%;background:var(--c-savings)"></div>
+    </div>
+    <div class="goal-pct">${pct.toFixed(1)}% complete${rem === 0 ? ' — 🎉 Goal reached!' : ' — ' + fmt(rem) + ' to go'}</div>
+  `;
+  form.style.display = 'none';
+}
+
+// Wishlist
+
+function addWishItem() {
+  const name  = document.getElementById('wish-name').value.trim();
+  const price = Math.round(parseFloat(document.getElementById('wish-price').value) * 100) / 100;
+  const daily = Math.round(parseFloat(document.getElementById('wish-daily').value) * 100) / 100;
+  if (!name)               { alert('Please enter an item name.'); return; }
+  if (!price || price <= 0) { alert('Please enter a valid price.'); return; }
+  if (!daily || daily <= 0) { alert('Please enter a daily savings amount.'); return; }
+  data.wishlist.unshift({ id: Date.now(), name, price, dailySavings: daily, purchased: false });
+  saveData();
+  document.getElementById('wish-name').value = '';
+  document.getElementById('wish-price').value = '';
+  document.getElementById('wish-daily').value = '';
+  renderWishlist();
+}
+
+function markPurchased(id) {
+  const w = data.wishlist.find(x => x.id === id);
+  if (w) { w.purchased = true; saveData(); renderWishlist(); }
+}
+
+function deleteWishItem(id) {
+  data.wishlist = data.wishlist.filter(x => x.id !== id);
+  saveData(); renderWishlist();
+}
+
+function renderWishlist() {
+  const el = document.getElementById('wish-list');
+  if (!data.wishlist.length) { el.innerHTML = '<p class="empty">No wishlist items yet.</p>'; return; }
+
+  const active = data.wishlist.filter(w => !w.purchased);
+  const done   = data.wishlist.filter(w =>  w.purchased);
+  let html = '';
+
+  active.forEach(w => {
+    const days = Math.ceil(w.price / w.dailySavings);
+    html += `<div class="wish-item">
+      <div class="wish-info">
+        <div class="wish-name">${esc(w.name)}</div>
+        <div class="wish-price">${fmt(w.price)}</div>
+        <div class="wish-days">⏳ ${days} day${days !== 1 ? 's' : ''} to go (saving ${fmt(w.dailySavings)}/day)</div>
+      </div>
+      <div class="wish-actions">
+        <button class="btn btn-primary btn-sm" onclick="markPurchased(${w.id})">✓ Got it!</button>
+        <button class="btn btn-ghost btn-sm"   onclick="deleteWishItem(${w.id})">Delete</button>
+      </div>
+    </div>`;
+  });
+
+  if (done.length) {
+    html += '<div class="archived-lbl">✅ Purchased</div>';
+    done.forEach(w => {
+      html += `<div class="wish-item purchased">
+        <div class="wish-info">
+          <div class="wish-name" style="text-decoration:line-through">${esc(w.name)}</div>
+          <div class="wish-price">${fmt(w.price)}</div>
+        </div>
+        <button class="btn btn-ghost btn-sm" onclick="deleteWishItem(${w.id})">Remove</button>
+      </div>`;
+    });
+  }
+
+  el.innerHTML = html;
+}
+
+// Savings calculator
+
+function calcSavings() {
+  const amt  = parseFloat(document.getElementById('calc-amt').value);
+  const days = parseInt(document.getElementById('calc-period').value);
+  if (!amt || amt <= 0) { alert('Please enter a valid amount.'); return; }
+  const total = Math.round(amt * days * 100) / 100;
+  const sel   = document.getElementById('calc-period');
+  const lbl   = sel.options[sel.selectedIndex].text;
+  const el    = document.getElementById('calc-result');
+  el.style.display = 'block';
+  el.innerHTML = `<div class="calc-box">
+    <div class="calc-desc">Saving ${fmt(amt)}/day for ${lbl}</div>
+    <span class="big-num">${fmt(total)}</span>
+    <div class="calc-desc">total saved</div>
+  </div>`;
+}
+
+// ══════════════════════════════════════════════
+// SUMMARY TAB
+// ══════════════════════════════════════════════
+
+function setPeriod(mode) {
+  summaryMode = mode;
+  document.getElementById('period-week').classList.toggle('active',  mode === 'week');
+  document.getElementById('period-month').classList.toggle('active', mode === 'month');
+  renderSummary();
+}
+
+function renderSummary() {
+  const start   = summaryMode === 'week' ? mondayStr() : monthStartStr();
+  const range   = data.transactions.filter(t => t.date >= start);
+  const inc     = range.filter(t => t.type === 'income').reduce((s,t) => s + t.amount, 0);
+  const exp     = range.filter(t => t.type === 'expense').reduce((s,t) => s + t.amount, 0);
+  const net     = inc - exp;
+
+  document.getElementById('sum-cards').innerHTML = `
+    <div class="sum-card sc-income"><div class="sc-lbl">Earned</div><div class="sc-val">${fmt(inc)}</div></div>
+    <div class="sum-card sc-expense"><div class="sc-lbl">Spent</div><div class="sc-val">${fmt(exp)}</div></div>
+    <div class="sum-card ${net >= 0 ? 'sc-savings' : 'sc-expense'}"><div class="sc-lbl">Net</div><div class="sc-val">${fmt(net)}</div></div>
+  `;
+
+  const exps = range.filter(t => t.type === 'expense');
+  const chart = document.getElementById('sum-chart');
+  if (!exps.length) { chart.innerHTML = '<p class="empty">No expenses in this period.</p>'; return; }
+
+  const totals = {};
+  exps.forEach(t => { totals[t.category] = (totals[t.category] || 0) + t.amount; });
+  const maxV  = Math.max(...Object.values(totals));
+  const rows  = Object.entries(totals).sort((a,b) => b[1] - a[1]);
+
+  chart.innerHTML = rows.map(([cat, amt]) => `
+    <div class="chart-row">
+      <span class="chart-lbl">${CAT_ICONS[cat] || '📦'} ${cat}</span>
+      <div class="chart-track"><div class="chart-fill" style="width:${((amt/maxV)*100).toFixed(1)}%"></div></div>
+      <span class="chart-amt">${fmt(amt)}</span>
+    </div>
+  `).join('');
+}
+
+// ══════════════════════════════════════════════
+// TOOLS TAB
+// ══════════════════════════════════════════════
+
+function renderTools() { renderEnvelopes(); }
+
+function splitBill() {
+  const total  = parseFloat(document.getElementById('split-total').value);
+  const people = parseInt(document.getElementById('split-people').value);
+  const tip    = parseFloat(document.getElementById('split-tip').value) || 0;
+  if (!total  || total  <= 0) { alert('Please enter the bill total.'); return; }
+  if (!people || people <  1) { alert('Please enter number of people.'); return; }
+
+  const withTip  = total * (1 + tip / 100);
+  const perPerson = Math.round((withTip / people) * 100) / 100;
+  const tipAmt   = Math.round((withTip - total) * 100) / 100;
+  const el = document.getElementById('split-result');
+  el.style.display = 'block';
+  el.innerHTML = `<div class="split-result">
+    <span class="split-per">${fmt(perPerson)}</span>
+    <div class="split-label">per person</div>
+    <div class="split-label" style="margin-top:0.4rem">${people} people · ${fmt(total)} bill${tip > 0 ? ' + ' + tip + '% tip (' + fmt(tipAmt) + ')' : ''}</div>
+  </div>`;
+}
+
+function renderEnvelopes() {
+  const mon = mondayStr();
+  document.getElementById('env-list').innerHTML = Object.keys(CAT_ICONS).map(cat => {
+    const lim   = data.envelopes[cat] || 0;
+    const spent = data.transactions.filter(t => t.type === 'expense' && t.category === cat && t.date >= mon)
+                    .reduce((s,t) => s + t.amount, 0);
+    const pct   = lim > 0 ? Math.min(100, (spent / lim) * 100) : 0;
+    const ratio = lim > 0 ? spent / lim : 0;
+    const aCls  = ratio >= 1 ? 'danger' : ratio >= 0.8 ? 'warn' : '';
+    const bCls  = ratio >= 1 ? 'bar-danger' : ratio >= 0.8 ? 'bar-warn' : '';
+    return `<div class="env-row">
+      <div class="env-hdr">
+        <span class="env-cat">${CAT_ICONS[cat]} ${cat}</span>
+        <span class="env-amts ${aCls}">${lim > 0 ? fmt(spent) + ' / ' + fmt(lim) : 'No limit set'}</span>
+      </div>
+      <div class="bar-track"><div class="bar-fill ${bCls}" style="width:${pct.toFixed(1)}%"></div></div>
+      <div class="env-inp">
+        <input type="number" id="env-${cat}" value="${lim || ''}" placeholder="Weekly limit (0 = none)" min="0" inputmode="decimal">
+      </div>
+    </div>`;
+  }).join('');
+}
+
+function saveEnvelopes() {
+  Object.keys(CAT_ICONS).forEach(cat => {
+    const v = parseFloat(document.getElementById('env-' + cat).value);
+    data.envelopes[cat] = v > 0 ? Math.round(v * 100) / 100 : 0;
+  });
+  saveData(); renderEnvelopes();
+  const btn = document.getElementById('btn-save-env');
+  btn.textContent = 'Saved ✓'; btn.disabled = true;
+  setTimeout(() => { btn.textContent = 'Save Budgets'; btn.disabled = false; }, 1500);
+}
+
+// ══════════════════════════════════════════════
+// SETTINGS TAB
+// ══════════════════════════════════════════════
+
+function renderSettings() {
+  document.getElementById('s-currency').value     = data.currency;
+  document.getElementById('s-limit-on').checked   = data.dailyLimit.enabled;
+  document.getElementById('s-limit-wrap').style.display = data.dailyLimit.enabled ? 'block' : 'none';
+  if (data.dailyLimit.amount) document.getElementById('s-limit-amt').value = data.dailyLimit.amount;
+  ['auto','light','dark'].forEach(m => document.getElementById('dm-' + m).classList.toggle('active', data.darkMode === m));
+}
+
+function changeCurrency(val) { data.currency = val; saveData(); renderHeader(); }
+
+function toggleLimit(on) {
+  data.dailyLimit.enabled = on; saveData();
+  document.getElementById('s-limit-wrap').style.display = on ? 'block' : 'none';
+  renderHome();
+}
+
+function saveLimitAmt() {
+  const v = parseFloat(document.getElementById('s-limit-amt').value);
+  data.dailyLimit.amount = v > 0 ? Math.round(v * 100) / 100 : 0;
+  saveData(); renderHome();
+}
+
+function resetData() {
+  const btn = document.getElementById('btn-reset');
+  if (btn.classList.contains('btn-confirm')) {
+    clearTimeout(resetTimer);
+    data = JSON.parse(JSON.stringify(DEFAULT_DATA));
+    saveData(); location.reload();
+  } else {
+    btn.classList.add('btn-confirm');
+    btn.textContent = 'Tap again to confirm';
+    resetTimer = setTimeout(() => {
+      btn.classList.remove('btn-confirm');
+      btn.textContent = 'Reset All Data';
+    }, 3000);
+  }
+}
+
+// ══════════════════════════════════════════════
+// ONBOARDING
+// ══════════════════════════════════════════════
+
+function completeOnboarding() {
+  const name = document.getElementById('ob-name').value.trim();
+  const limOn = document.getElementById('ob-limit-on').checked;
+  const limAmt = parseFloat(document.getElementById('ob-limit-amt').value) || 0;
+
+  data.onboarded       = true;
+  data.userName        = name || 'Friend';
+  data.currency        = document.getElementById('ob-currency').value;
+  data.dailyLimit.enabled = limOn;
+  data.dailyLimit.amount  = limOn ? Math.round(limAmt * 100) / 100 : 0;
+  saveData();
+
+  document.getElementById('onboarding').style.display = 'none';
+  document.getElementById('app').style.display        = 'flex';
+  renderHeader(); navigate('home');
+}
+
+// ══════════════════════════════════════════════
+// INIT
+// ══════════════════════════════════════════════
+
+applyDarkMode();
+
+if (data.onboarded) {
+  document.getElementById('onboarding').style.display = 'none';
+  document.getElementById('app').style.display        = 'flex';
+  renderHeader(); navigate('home');
+} else {
+  document.getElementById('onboarding').style.display = 'flex';
+}
+
+setType('income');
+</script>
+</body>
+</html>
